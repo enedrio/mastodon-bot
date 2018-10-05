@@ -1,0 +1,23 @@
+{
+  "name": "mastodon-bot",
+  "version": "0.0.1",
+  "description": "My bot for TheDevMinerTV at botsin.space",
+  "main": "bot.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheDevMinerTV/mastodon-bot.git"
+  },
+  "keywords": [
+    "bot",
+    "mastodon"
+  ],
+  "author": "TheDevMinerTV",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/TheDevMinerTV/mastodon-bot/issues"
+  },
+  "homepage": "https://github.com/TheDevMinerTV/mastodon-bot#readme"
+}
