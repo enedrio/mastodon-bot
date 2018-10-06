@@ -2,9 +2,12 @@ const Mastodon = require('mastodon-api');
 const path = require('path');
 const env = require('dotenv');
 const fs = require('fs');
-const PDF2Pic = require('pdf2pic').default
+const PDF2Pic = require('pdf2pic').default;
 const gm = require('gm');
-var glob = require("glob")
+const glob = require('glob');
+const http = require('http');
+const datereq = require('date-and-time');
+const sleep = require('sleep');
 
 let converter = new PDF2Pic({
     density: 100,           // output pixels per inch
@@ -12,15 +15,13 @@ let converter = new PDF2Pic({
     savedir: "./images",    // output file location
     format: "png",          // output file format
     size: 1200              // output size in pixels
-})
+});
 env.config();
-var server = "http://www.sn.schule.de/~ms55l/"
-var day = "montag"
-var output = "montag.pdf"
-
-
-console.log("Mastodon bot starting. . . ")
-
+var server = "http://www.sn.schule.de/~ms55l/";
+var day = "montag";
+var displayDay = "";
+var imagedir = __dirname + "/images";
+var output = "montag.pdf";
 const M = new Mastodon({
     client_secret: process.env.CLIENT_SECRET,
     client_key: process.env.CLIENT_KEY,
@@ -29,6 +30,39 @@ const M = new Mastodon({
     api_url: 'https://botsin.space/api/v1/', // optional, defaults to https://mastodon.social/api/v1/
 });
 
+console.log("Mastodon bot starting. . . ");
+
+function whichDay() {
+    let now = new Date();
+    var date = datereq.format(now, 'ddd');
+    
+    if (date === 'Sat') {
+        displayDay = "Montag";
+        day = "montag";
+        console.log(day);
+    } else if (date === 'Tue') {
+        displayDay = "Dienstag";
+        day = "dienstag";
+        console.log(day);
+    } else if (date === 'Wed') {
+        displayDay = "Mittwoch";
+        day = "mittwoch";
+        console.log(day);
+    } else if (date === 'Thu') {
+        displayDay = "Donnerstag";
+        day = "donnerstag";
+        console.log(day);
+    } else if (date === 'Fri') {
+        displayDay = "Freitag";
+        day = "freitag";
+        console.log(day);
+    } else {
+        console.log("Waiting one day. . .");
+        sleep.sleep(60 * 60 * 24);
+        whichDay();
+    }
+}
+
 function download(url, place) {
     var file = fs.createWriteStream(place);
     var request = http.get(url, function(response) {
@@ -36,18 +70,15 @@ function download(url, place) {
     });
 }
 
-
-
 function prepareImage(input) {
     converter.convertBulk(input, -1)
     .then(resolve => {
         console.log("image converted successfully")
     });
-    setTimeout(merge, 2500, text);
 }
 
 function merge(text){
-    var imagedir = __dirname + "/images";
+    
     console.log("Starting merge");
     
     if (((fs.existsSync(imagedir + "/image_1.png")) && (!fs.existsSync(imagedir + "/image_2.png"))) && (!fs.existsSync(imagedir + "/image_3.png"))) {
@@ -98,7 +129,7 @@ function toot(text) {
     });
 }
 
-function tootImage(text, image) {
+function tootImage(text) {
     M.post('media', { file: fs.createReadStream(__dirname + "/output.png") }).then(resp => {
         const id = resp.data.id;
         M.post('statuses', { status: text, media_ids: [id] })
@@ -115,12 +146,29 @@ function deleteFiles() {
     if (fs.existsSync(__dirname + "/output.png")){
         fs.unlinkSync(__dirname + "/output.png");      
     }
+    if (fs.existsSync(__dirname + "/input.pdf")){
+        fs.unlinkSync(__dirname + "/input.pdf");      
+    }
 }
 
 function startBot() {
-    download(server + day + ".pdf", "output.pdf");
+    whichDay();
+    console.log("Downloading: " + server + day + ".pdf")
+    download(server + day + ".pdf", "input.pdf");
+    console.log("Converting PDF " + __dirname + "/input.pdf to PNG");
+    prepareImage(`${__dirname}/input.pdf`);
+    
+    setTimeout(merge, 2500, "Hier ist der Vertretungsplan für" + displayDay);
     tootImage("Hi boys!");
 }
+
+//startBot();
+
+setTimeout(deleteFiles, 1000);
+setTimeout(download, 1000, server + day + ".pdf", "input.pdf");
+setTimeout(prepareImage, 2000, `${__dirname}/input.pdf`);
+
+
 
 
 /*
