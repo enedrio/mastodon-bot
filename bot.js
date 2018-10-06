@@ -4,7 +4,6 @@ const env = require('dotenv');
 const fs = require('fs');
 const PDF2Pic = require('pdf2pic').default
 const gm = require('gm');
-const sleep = require('sleep');
 var glob = require("glob")
 
 // options is optional
@@ -87,16 +86,19 @@ function merge(text){
             M.post('statuses', { status: text, media_ids: [id] })
         });
     }
-    
+    setTimeout(deleteFiles, 1000);
+}
+
+function deleteFiles() {
     glob(imagedir + "/*", function(err, files) {
         for (var i of files) {
-            fs.unlinkSync(files);
+            console.log(i);
+            fs.unlinkSync(i);
         }
     });  
-    fs.unlinkSync(__dirname + "/output.png");      
-    
-    //fs.unlinkSync(files);
-    
+    if (fs.existsSync(__dirname + "/output.png")){
+        fs.unlinkSync(__dirname + "/output.png");      
+    }
 }
 
 function toot(text) {
