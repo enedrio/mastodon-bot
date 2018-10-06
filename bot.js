@@ -4,9 +4,13 @@ const env = require('dotenv');
 const fs = require('fs');
 const PDF2Pic = require('pdf2pic').default
 const gm = require('gm');
+const sleep = require('sleep');
+var glob = require("glob")
+
+// options is optional
 
 
-var imagedir = "/home/tobias/mastodon-bot/images/"
+var imagedir = "/home/tobias/mastodon-bot/images"
 let converter = new PDF2Pic({
     density: 100,           // output pixels per inch
     savename: "image",      // output file name
@@ -28,65 +32,69 @@ const M = new Mastodon({
 
 
 function tootImage(text) {
-    var input = "/home/tobias/Downloads/test2.pdf"
+    var input = "/home/tobias/Downloads/test3.pdf"
     
     converter.convertBulk(input, -1)
     .then(resolve => {
         console.log("image converted successfully")
     });
-
-    setTimeout(merge, 2500);
+    setTimeout(merge, 2500, text);
 }
 
-function merge(){
+function merge(text){
     console.log("Merging");
+    
     if (((fs.existsSync(imagedir + "/image_1.png")) && (!fs.existsSync(imagedir + "/image_2.png"))) && (!fs.existsSync(imagedir + "/image_3.png"))) {
-        console.log("No need to merge!");
-        M.post('media', { file: fs.createReadStream(imagedir + "/image_1.png") }).then(resp => {
+        console.log("I have 1 image to merge!")
+        M.post('media', { file: fs.createReadStream(`${imagedir}/image_1.png`) }).then(resp => {
             const id = resp.data.id;
-            M.post('statuses', { status: "Here is the replacement school plan!", media_ids: [id] })
+            M.post('statuses', { status: text, media_ids: [id] })
         });
-        process.exit(0);
         
     } else if (((fs.existsSync(imagedir + "/image_1.png")) && (fs.existsSync(imagedir + "/image_2.png"))) && (!fs.existsSync(imagedir + "/image_3.png"))) {
-        console.log("Need to merge 2 images!");
+        console.log("I have 2 images to merge!")
         gm()
         .in('-page', '+0+0')
-        .in(imagedir + 'image_1.png')
+        .in(`${imagedir}/image_1.png`)
         .in('-page', '+0+1696')
-        .in(imagedir + 'image_2.png')
+        .in(`${imagedir}/image_2.png`)
         .mosaic()  // Merges the images as a matrix
         .write('output.png', function (err) {
             if (err) console.log(err);
         });
-        M.post('media', { file: fs.createReadStream("/output.png") }).then(resp => {
+        M.post('media', { file: fs.createReadStream(`${__dirname}/output.png`) }).then(resp => {
             const id = resp.data.id;
-            M.post('statuses', { status: "Here is the replacement school plan!", media_ids: [id] })
+            M.post('statuses', { status: text, media_ids: [id] })
         });
-        console.log("Tooted the image")
-        process.exit(0);
+        
         
     } else if (((fs.existsSync(imagedir + "/image_1.png")) && (fs.existsSync(imagedir + "/image_2.png"))) && (fs.existsSync(imagedir + "/image_3.png"))) {
-        console.log("Need to merge 3 images!");
+        console.log("I have 3 images to merge!")
         gm()
         .in('-page', '+0+0')
-        .in(imagedir + 'image_1.png')
+        .in(`${imagedir}/image_1.png`)
         .in('-page', '+0+1696')
-        .in(imagedir + 'image_2.png')
+        .in(`${imagedir}/image_2.png`)
         .in('-page', '+0+3392')
-        .in(imagedir + 'image_3.png')
+        .in(`${imagedir}/image_3.png`)
         .mosaic()  // Merges the images as a matrix
-        .write('output.png', function (err) {
+        .write(__dirname + 'output.png', function (err) {
             if (err) console.log(err);
         });
         
-        M.post('media', { file: fs.createReadStream(__dirname + "/output.png") }).then(resp => {
+        M.post('media', { file: fs.createReadStream(`${__dirname}/output.png`) }).then(resp => {
             const id = resp.data.id;
-            M.post('statuses', { status: "Here is the replacement school plan!", media_ids: [id] })
+            M.post('statuses', { status: text, media_ids: [id] })
         });
-        process.exit(0);
-        
     }
+    
+    glob(imagedir + "/*", function(err, files) {
+        for (var i = 1 ; i <= files.length(), i++){
+            fs.unlinkSync(files);
+        }
+    });        
+    
+    //fs.unlinkSync(files);
     
 }
 
@@ -104,6 +112,7 @@ function toot(text) {
         }
     });
 }
+
 
 tootImage("Hi boys!");
 
