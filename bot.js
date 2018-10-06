@@ -6,10 +6,6 @@ const PDF2Pic = require('pdf2pic').default
 const gm = require('gm');
 var glob = require("glob")
 
-// options is optional
-
-
-var imagedir = "/home/tobias/mastodon-bot/images"
 let converter = new PDF2Pic({
     density: 100,           // output pixels per inch
     savename: "image",      // output file name
@@ -18,6 +14,10 @@ let converter = new PDF2Pic({
     size: 1200              // output size in pixels
 })
 env.config();
+var server = "http://www.sn.schule.de/~ms55l/"
+var day = "montag"
+var output = "montag.pdf"
+
 
 console.log("Mastodon bot starting. . . ")
 
@@ -29,10 +29,16 @@ const M = new Mastodon({
     api_url: 'https://botsin.space/api/v1/', // optional, defaults to https://mastodon.social/api/v1/
 });
 
+function download(url, place) {
+    var file = fs.createWriteStream(place);
+    var request = http.get(url, function(response) {
+        response.pipe(file);
+    });
+}
 
-function tootImage(text) {
-    var input = "/home/tobias/Downloads/test3.pdf"
-    
+
+
+function prepareImage(input) {
     converter.convertBulk(input, -1)
     .then(resolve => {
         console.log("image converted successfully")
@@ -41,15 +47,12 @@ function tootImage(text) {
 }
 
 function merge(text){
-    console.log("Merging");
+    var imagedir = __dirname + "/images";
+    console.log("Starting merge");
     
     if (((fs.existsSync(imagedir + "/image_1.png")) && (!fs.existsSync(imagedir + "/image_2.png"))) && (!fs.existsSync(imagedir + "/image_3.png"))) {
-        console.log("I have 1 image to merge!")
-        M.post('media', { file: fs.createReadStream(`${imagedir}/image_1.png`) }).then(resp => {
-            const id = resp.data.id;
-            M.post('statuses', { status: text, media_ids: [id] })
-        });
-        
+        console.log("No need to merge!")
+        tootImage(text);
     } else if (((fs.existsSync(imagedir + "/image_1.png")) && (fs.existsSync(imagedir + "/image_2.png"))) && (!fs.existsSync(imagedir + "/image_3.png"))) {
         console.log("I have 2 images to merge!")
         gm()
@@ -61,12 +64,7 @@ function merge(text){
         .write('output.png', function (err) {
             if (err) console.log(err);
         });
-        M.post('media', { file: fs.createReadStream(`${__dirname}/output.png`) }).then(resp => {
-            const id = resp.data.id;
-            M.post('statuses', { status: text, media_ids: [id] })
-        });
-        
-        
+        tootImage(text);
     } else if (((fs.existsSync(imagedir + "/image_1.png")) && (fs.existsSync(imagedir + "/image_2.png"))) && (fs.existsSync(imagedir + "/image_3.png"))) {
         console.log("I have 3 images to merge!")
         gm()
@@ -80,25 +78,9 @@ function merge(text){
         .write(__dirname + 'output.png', function (err) {
             if (err) console.log(err);
         });
-        
-        M.post('media', { file: fs.createReadStream(`${__dirname}/output.png`) }).then(resp => {
-            const id = resp.data.id;
-            M.post('statuses', { status: text, media_ids: [id] })
-        });
+        tootImage(text);
     }
     setTimeout(deleteFiles, 1000);
-}
-
-function deleteFiles() {
-    glob(imagedir + "/*", function(err, files) {
-        for (var i of files) {
-            console.log(i);
-            fs.unlinkSync(i);
-        }
-    });  
-    if (fs.existsSync(__dirname + "/output.png")){
-        fs.unlinkSync(__dirname + "/output.png");      
-    }
 }
 
 function toot(text) {
@@ -116,8 +98,29 @@ function toot(text) {
     });
 }
 
+function tootImage(text, image) {
+    M.post('media', { file: fs.createReadStream(__dirname + "/output.png") }).then(resp => {
+        const id = resp.data.id;
+        M.post('statuses', { status: text, media_ids: [id] })
+    });
+}
 
-tootImage("Hi boys!");
+function deleteFiles() {
+    glob(imagedir + "/*", function(err, files) {
+        for (var i of files) {
+            console.log(i);
+            fs.unlinkSync(i);
+        }
+    });  
+    if (fs.existsSync(__dirname + "/output.png")){
+        fs.unlinkSync(__dirname + "/output.png");      
+    }
+}
+
+function startBot() {
+    download(server + day + ".pdf", "output.pdf");
+    tootImage("Hi boys!");
+}
 
 
 /*
