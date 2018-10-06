@@ -89,10 +89,11 @@ function merge(text){
     }
     
     glob(imagedir + "/*", function(err, files) {
-        for (var i = 1 ; i <= files.length(), i++){
+        for (var i of files) {
             fs.unlinkSync(files);
         }
-    });        
+    });  
+    fs.unlinkSync(__dirname + "/output.png");      
     
     //fs.unlinkSync(files);
     
