@@ -4,7 +4,6 @@ const env = require('dotenv');
 const fs = require('fs');
 const gm = require('gm');
 const glob = require('glob');
-const http = require('http');
 const datereq = require('date-and-time');
 const sleep = require('sleep');
 const pdftoimage = require('pdftoimage');
@@ -58,70 +57,70 @@ function whichDay() {
     }
 }
 
-function download(url) {
-    return new Promise(function() {
-        var input = "input.pdf"
-        console.log("Type of input: " + typeof(input));
-        console.log("Path: input.pdf");
-        var file = fs.createWriteStream(input);
-        var request = http.get(url, function(response) {
-            response.pipe(file);
-        });
-    });
+function downloadFileSync(url, file) {
+    return require('child_process')
+    .execFileSync('curl', ['--silent', '-L', '-o', file, url], {encoding: 'utf8'});
 }
 
-function prepareImage(input) {
-    sleep.sleep(2);
+function download(pdf, png, url, text, prep, merg, tootImg, delFiles) {
+    console.log("Type of input: " + typeof(pdf));
+    console.log("Path: " + pdf);
+    downloadFileSync(url, pdf);
+    setTimeout(prep, 2500, pdf, png, text, merg, tootImg, delFiles);
+}
+
+function prepareImage(pdf, png, text, merg, tootImg, delFiles) {
     console.log("Converting");
-    pdftoimage(input, {
+    pdftoimage(pdf, {
         format: 'png',  // png, jpeg, tiff or svg, defaults to png
         prefix: 'image',  // prefix for each image except svg, defaults to input filename
         outdir: 'out'   // path to output directory, defaults to current directory
     })
     .then(function(){
         console.log('Conversion done');
+        setTimeout(merg, 2500, png, text, tootImg, delFiles);
     })
     .catch(function(err){
         console.log(err);
     });
 }
 
-function merge(){
+function merge(png, text, tootImg, delFiles){
     
     console.log("Starting merge");
     
-    if (((fs.existsSync(imagedir + "/image_1.png")) && (!fs.existsSync(imagedir + "/image_2.png"))) && (!fs.existsSync(imagedir + "/image_3.png"))) {
-        return new Promise(function(resolve, reject) {
-            console.log("No need to merge!");
+    if (((fs.existsSync(imagedir + "/image-1.png")) && (!fs.existsSync(imagedir + "/image-2.png"))) && (!fs.existsSync(imagedir + "/image-3.png"))) {
+        console.log("No need to merge!");
+        setTimeout(tootImage, 2500, png, text, delFiles);
+        
+    } else if (((fs.existsSync(imagedir + "/image-1.png")) && (fs.existsSync(imagedir + "/image-2.png"))) && (!fs.existsSync(imagedir + "/image-3.png"))) {
+        console.log("I have 2 images to merge!")
+        gm()
+        .in('-page', '+0+0')
+        .in(`${imagedir}/image-1.png`)
+        .in('-page', '+0+1696')
+        .in(`${imagedir}/image-2.png`)
+        .mosaic()  // Merges the images as a matrix
+        .write(png, function (err) {
+            if (err) console.log(err);
         });
-    } else if (((fs.existsSync(imagedir + "/image_1.png")) && (fs.existsSync(imagedir + "/image_2.png"))) && (!fs.existsSync(imagedir + "/image_3.png"))) {
-        return new Promise(function(imagedir) {
-            console.log("I have 2 images to merge!")
-            gm()
-            .in('-page', '+0+0')
-            .in(`${imagedir}/image_1.png`)
-            .in('-page', '+0+1696')
-            .in(`${imagedir}/image_2.png`)
-            .mosaic()  // Merges the images as a matrix
-            .write('output.png', function (err) {
-                if (err) console.log(err);
-            });
-        });
-    } else if (((fs.existsSync(imagedir + "/image_1.png")) && (fs.existsSync(imagedir + "/image_2.png"))) && (fs.existsSync(imagedir + "/image_3.png"))) {
+        setTimeout(tootImage, 2500, png, text, delFiles);
+        
+    } else if (((fs.existsSync(imagedir + "/image-1.png")) && (fs.existsSync(imagedir + "/image-2.png"))) && (fs.existsSync(imagedir + "/image-3.png"))) {
         console.log("I have 3 images to merge!")
-        return new Promise(function(imagedir) {
-            gm()
-            .in('-page', '+0+0')
-            .in(`${imagedir}/image_1.png`)
-            .in('-page', '+0+1696')
-            .in(`${imagedir}/image_2.png`)
-            .in('-page', '+0+3392')
-            .in(`${imagedir}/image_3.png`)
-            .mosaic()  // Merges the images as a matrix
-            .write(__dirname + 'output.png', function (err) {
-                if (err) console.log(err);
-            });
+        gm()
+        .in('-page', '+0+0')
+        .in(`${imagedir}/image-1.png`)
+        .in('-page', '+0+1696')
+        .in(`${imagedir}/image-2.png`)
+        .in('-page', '+0+3392')
+        .in(`${imagedir}/image-3.png`)
+        .mosaic()  // Merges the images as a matrix
+        .write(png, function (err) {
+            if (err) console.log(err);
         });
+        setTimeout(tootImage, 2500, png, text, delFiles);
+        
     }
 }
 
@@ -140,17 +139,15 @@ function toot(text) {
     });
 }
 
-function tootImage(text, image) {
-    return new Promise(function(text, image) {
-        M.post('media', { file: fs.createReadStream(image) }).then(resp => {
-            const id = resp.data.id;
-            M.post('statuses', { status: text, media_ids: [id] })
-        });
-    });
+function tootImage(png, text, delFiles) {
+    M.post('media', { file: fs.createReadStream(png) }).then(resp => {
+        const id = resp.data.id;
+        M.post('statuses', { status: text, media_ids: [id] })
+    }).then(setTimeout(delFiles, 2500));
 }
 
 function deleteFiles() {
-    glob(imagedir + "/*", function(err, files) {
+    glob(imagedir + "/*.png", function(err, files) {
         for (var i of files) {
             console.log(i);
             fs.unlinkSync(i);
@@ -166,18 +163,17 @@ function deleteFiles() {
 
 function startBot() {
     whichDay();
-    sleep.sleep(3);
-    var config = [
-        download(server + day + ".pdf"),
-        prepareImage("/home/tobias/mastodon-bot/input.pdf"),
-        merge(),
-        tootImage("Hier ist der Vertretungsplan für " + displayDay, "/home/tobias/mastodon-bot/input.png")
-    ];
+    sleep.sleep(1);
     
-    Promise.all(config)
-    .catch(err => {  
-        console.log(err);
-    });
+    download("/home/tobias/mastodon-bot/input.pdf",
+    "/home/tobias/mastodon-bot/output.png",
+    server + day + ".pdf",
+    "Hier ist der Vertretungsplan für " + displayDay,
+    prepareImage,
+    merge,
+    tootImage,
+    deleteFiles
+    );
 }
 
 startBot();

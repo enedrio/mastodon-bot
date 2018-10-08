@@ -2,5 +2,4 @@
 node_modules
 output.png
 output.pdf
-images/*
-package-lock.json
+.vscode/*
