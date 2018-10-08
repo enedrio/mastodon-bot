@@ -2,26 +2,19 @@ const Mastodon = require('mastodon-api');
 const path = require('path');
 const env = require('dotenv');
 const fs = require('fs');
-const PDF2Pic = require('pdf2pic').default;
 const gm = require('gm');
 const glob = require('glob');
 const http = require('http');
 const datereq = require('date-and-time');
 const sleep = require('sleep');
+const pdftoimage = require('pdftoimage');
 
-let converter = new PDF2Pic({
-    density: 100,           // output pixels per inch
-    savename: "image",      // output file name
-    savedir: "./images",    // output file location
-    format: "png",          // output file format
-    size: 1200              // output size in pixels
-});
+
 env.config();
 var server = "http://www.sn.schule.de/~ms55l/";
-var day = "montag";
+var day = "";
 var displayDay = "";
-var imagedir = __dirname + "/images";
-var output = "montag.pdf";
+var imagedir = __dirname + "/out";
 const M = new Mastodon({
     client_secret: process.env.CLIENT_SECRET,
     client_key: process.env.CLIENT_KEY,
@@ -30,13 +23,15 @@ const M = new Mastodon({
     api_url: 'https://botsin.space/api/v1/', // optional, defaults to https://mastodon.social/api/v1/
 });
 
+
 console.log("Mastodon bot starting. . . ");
+
 
 function whichDay() {
     let now = new Date();
     var date = datereq.format(now, 'ddd');
     
-    if (date === 'Sat') {
+    if (date === 'Mon') {
         displayDay = "Montag";
         day = "montag";
         console.log(day);
@@ -63,55 +58,71 @@ function whichDay() {
     }
 }
 
-function download(url, place) {
-    var file = fs.createWriteStream(place);
-    var request = http.get(url, function(response) {
-        response.pipe(file);
+function download(url) {
+    return new Promise(function() {
+        var input = "input.pdf"
+        console.log("Type of input: " + typeof(input));
+        console.log("Path: input.pdf");
+        var file = fs.createWriteStream(input);
+        var request = http.get(url, function(response) {
+            response.pipe(file);
+        });
     });
 }
 
 function prepareImage(input) {
-    converter.convertBulk(input, -1)
-    .then(resolve => {
-        console.log("image converted successfully")
+    sleep.sleep(2);
+    console.log("Converting");
+    pdftoimage(input, {
+        format: 'png',  // png, jpeg, tiff or svg, defaults to png
+        prefix: 'image',  // prefix for each image except svg, defaults to input filename
+        outdir: 'out'   // path to output directory, defaults to current directory
+    })
+    .then(function(){
+        console.log('Conversion done');
+    })
+    .catch(function(err){
+        console.log(err);
     });
 }
 
-function merge(text){
+function merge(){
     
     console.log("Starting merge");
     
     if (((fs.existsSync(imagedir + "/image_1.png")) && (!fs.existsSync(imagedir + "/image_2.png"))) && (!fs.existsSync(imagedir + "/image_3.png"))) {
-        console.log("No need to merge!")
-        tootImage(text);
-    } else if (((fs.existsSync(imagedir + "/image_1.png")) && (fs.existsSync(imagedir + "/image_2.png"))) && (!fs.existsSync(imagedir + "/image_3.png"))) {
-        console.log("I have 2 images to merge!")
-        gm()
-        .in('-page', '+0+0')
-        .in(`${imagedir}/image_1.png`)
-        .in('-page', '+0+1696')
-        .in(`${imagedir}/image_2.png`)
-        .mosaic()  // Merges the images as a matrix
-        .write('output.png', function (err) {
-            if (err) console.log(err);
+        return new Promise(function(resolve, reject) {
+            console.log("No need to merge!");
         });
-        tootImage(text);
+    } else if (((fs.existsSync(imagedir + "/image_1.png")) && (fs.existsSync(imagedir + "/image_2.png"))) && (!fs.existsSync(imagedir + "/image_3.png"))) {
+        return new Promise(function(imagedir) {
+            console.log("I have 2 images to merge!")
+            gm()
+            .in('-page', '+0+0')
+            .in(`${imagedir}/image_1.png`)
+            .in('-page', '+0+1696')
+            .in(`${imagedir}/image_2.png`)
+            .mosaic()  // Merges the images as a matrix
+            .write('output.png', function (err) {
+                if (err) console.log(err);
+            });
+        });
     } else if (((fs.existsSync(imagedir + "/image_1.png")) && (fs.existsSync(imagedir + "/image_2.png"))) && (fs.existsSync(imagedir + "/image_3.png"))) {
         console.log("I have 3 images to merge!")
-        gm()
-        .in('-page', '+0+0')
-        .in(`${imagedir}/image_1.png`)
-        .in('-page', '+0+1696')
-        .in(`${imagedir}/image_2.png`)
-        .in('-page', '+0+3392')
-        .in(`${imagedir}/image_3.png`)
-        .mosaic()  // Merges the images as a matrix
-        .write(__dirname + 'output.png', function (err) {
-            if (err) console.log(err);
+        return new Promise(function(imagedir) {
+            gm()
+            .in('-page', '+0+0')
+            .in(`${imagedir}/image_1.png`)
+            .in('-page', '+0+1696')
+            .in(`${imagedir}/image_2.png`)
+            .in('-page', '+0+3392')
+            .in(`${imagedir}/image_3.png`)
+            .mosaic()  // Merges the images as a matrix
+            .write(__dirname + 'output.png', function (err) {
+                if (err) console.log(err);
+            });
         });
-        tootImage(text);
     }
-    setTimeout(deleteFiles, 1000);
 }
 
 function toot(text) {
@@ -129,10 +140,12 @@ function toot(text) {
     });
 }
 
-function tootImage(text) {
-    M.post('media', { file: fs.createReadStream(__dirname + "/output.png") }).then(resp => {
-        const id = resp.data.id;
-        M.post('statuses', { status: text, media_ids: [id] })
+function tootImage(text, image) {
+    return new Promise(function(text, image) {
+        M.post('media', { file: fs.createReadStream(image) }).then(resp => {
+            const id = resp.data.id;
+            M.post('statuses', { status: text, media_ids: [id] })
+        });
     });
 }
 
@@ -153,20 +166,22 @@ function deleteFiles() {
 
 function startBot() {
     whichDay();
-    console.log("Downloading: " + server + day + ".pdf")
-    download(server + day + ".pdf", "input.pdf");
-    console.log("Converting PDF " + __dirname + "/input.pdf to PNG");
-    prepareImage(`${__dirname}/input.pdf`);
+    sleep.sleep(3);
+    var config = [
+        download(server + day + ".pdf"),
+        prepareImage("/home/tobias/mastodon-bot/input.pdf"),
+        merge(),
+        tootImage("Hier ist der Vertretungsplan für " + displayDay, "/home/tobias/mastodon-bot/input.png")
+    ];
     
-    setTimeout(merge, 2500, "Hier ist der Vertretungsplan für" + displayDay);
-    tootImage("Hi boys!");
+    Promise.all(config)
+    .catch(err => {  
+        console.log(err);
+    });
 }
 
-//startBot();
+startBot();
 
-setTimeout(deleteFiles, 1000);
-setTimeout(download, 1000, server + day + ".pdf", "input.pdf");
-setTimeout(prepareImage, 2000, `${__dirname}/input.pdf`);
 
 
 
