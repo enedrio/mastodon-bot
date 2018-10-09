@@ -14,6 +14,9 @@ var server = "http://www.sn.schule.de/~ms55l/";
 var day = "";
 var displayDay = "";
 var imagedir = __dirname + "/out";
+var follows = [];
+var i = 0;
+var followsString = "";
 const M = new Mastodon({
     client_secret: process.env.CLIENT_SECRET,
     client_key: process.env.CLIENT_KEY,
@@ -133,7 +136,7 @@ function toot(text) {
         if (error){
             console.error(error);
         } else {
-            //fs.writeFileSync('data.json', JSON.stringify(data, null, 2));
+            fs.writeFileSync('data.json', JSON.stringify(data, null, 2));
             console.log("Successful at " + data.created_at + " with ID " + data.id);
         }
     });
@@ -176,13 +179,9 @@ function startBot() {
     );
 }
 
-startBot();
+// startBot();
 
 
-
-
-
-/*
 const listener = M.stream('streaming/user')
 
 listener.on('message', msg => {
@@ -190,6 +189,7 @@ listener.on('message', msg => {
         if (msg.data.type === 'follow') {
             const acct = msg.data.account.acct;
             const id = msg.data.account.id;
+            follows.push(`@${msg.data.account.acct}`);
             toot(`@${msg.data.account.acct} Hello and welcome aboard!`);
             
             fs.writeFileSync(`data.json${Date.now()}`, JSON.stringify(msg, null, 2));    
@@ -200,4 +200,7 @@ listener.on('message', msg => {
 });
 
 listener.on('error', err => console.log(err));
-*/
+while (i < follows.length) {
+    followsString = followsString + follows[i];
+}
+toot(`${followsString} Hello and welcome aboard!`);
