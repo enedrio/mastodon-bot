@@ -1,6 +1,6 @@
 const Mastodon = require('mastodon-api');
 const path = require('path');
-const env = require('dotenv');
+const env = require('dotenv').config();
 const fs = require('fs');
 const gm = require('gm');
 const glob = require('glob');
@@ -9,25 +9,22 @@ const sleep = require('sleep');
 const pdftoimage = require('pdftoimage');
 
 
-env.config();
 var server = "http://www.sn.schule.de/~ms55l/";
 var day = "";
 var displayDay = "";
 var imagedir = __dirname + "/out";
 var follows = [];
-var i = 0;
 var followsString = "";
+var instance = "https://botsin.space/api/v1/";
+
 const M = new Mastodon({
     client_secret: process.env.CLIENT_SECRET,
     client_key: process.env.CLIENT_KEY,
     access_token: process.env.AUTH_TOKEN,
-    timeout_ms: 60*1000,  // optional HTTP request timeout to apply to all requests.
-    api_url: 'https://botsin.space/api/v1/', // optional, defaults to https://mastodon.social/api/v1/
+    api_url: instance, // optional, defaults to https://mastodon.social/api/v1/
 });
 
-
 console.log("Mastodon bot starting. . . ");
-
 
 function whichDay() {
     let now = new Date();
@@ -36,23 +33,23 @@ function whichDay() {
     if (date === 'Mon') {
         displayDay = "Montag";
         day = "montag";
-        console.log(day);
+        console.log("Today is " + day);
     } else if (date === 'Tue') {
         displayDay = "Dienstag";
         day = "dienstag";
-        console.log(day);
+        console.log("Today is " + day);
     } else if (date === 'Wed') {
         displayDay = "Mittwoch";
         day = "mittwoch";
-        console.log(day);
+        console.log("Today is " + day);
     } else if (date === 'Thu') {
         displayDay = "Donnerstag";
         day = "donnerstag";
-        console.log(day);
+        console.log("Today is " + day);
     } else if (date === 'Fri') {
         displayDay = "Freitag";
         day = "freitag";
-        console.log(day);
+        console.log("Today is " + day);
     } else {
         console.log("Waiting one day. . .");
         sleep.sleep(60 * 60 * 24);
@@ -66,21 +63,20 @@ function downloadFileSync(url, file) {
 }
 
 function download(pdf, png, url, text, prep, merg, tootImg, delFiles) {
-    console.log("Type of input: " + typeof(pdf));
-    console.log("Path: " + pdf);
+    console.log("Downloading File: " + url + " to " + pdf);
     downloadFileSync(url, pdf);
     setTimeout(prep, 2500, pdf, png, text, merg, tootImg, delFiles);
 }
 
 function prepareImage(pdf, png, text, merg, tootImg, delFiles) {
-    console.log("Converting");
+    console.log("Converting " + pdf + " to /out/");
     pdftoimage(pdf, {
         format: 'png',  // png, jpeg, tiff or svg, defaults to png
         prefix: 'image',  // prefix for each image except svg, defaults to input filename
         outdir: 'out'   // path to output directory, defaults to current directory
     })
     .then(function(){
-        console.log('Conversion done');
+        console.log('Converted successfully!');
         setTimeout(merg, 2500, png, text, tootImg, delFiles);
     })
     .catch(function(err){
@@ -90,7 +86,7 @@ function prepareImage(pdf, png, text, merg, tootImg, delFiles) {
 
 function merge(png, text, tootImg, delFiles){
     
-    console.log("Starting merge");
+    console.log("Merging. . . ");
     
     if (((fs.existsSync(imagedir + "/image-1.png")) && (!fs.existsSync(imagedir + "/image-2.png"))) && (!fs.existsSync(imagedir + "/image-3.png"))) {
         console.log("No need to merge!");
@@ -146,13 +142,16 @@ function tootImage(png, text, delFiles) {
     M.post('media', { file: fs.createReadStream(png) }).then(resp => {
         const id = resp.data.id;
         M.post('statuses', { status: text, media_ids: [id] })
-    }).then(setTimeout(delFiles, 2500));
+    }).then(function() {
+        console.log("Done tooting!")
+        setTimeout(delFiles, 2500);
+    });
 }
 
 function deleteFiles() {
+    console.log("Deleting leftover files. . .");
     glob(imagedir + "/*.png", function(err, files) {
         for (var i of files) {
-            console.log(i);
             fs.unlinkSync(i);
         }
     });  
@@ -162,6 +161,7 @@ function deleteFiles() {
     if (fs.existsSync(__dirname + "/input.pdf")){
         fs.unlinkSync(__dirname + "/input.pdf");      
     }
+    console.log("Deleted leftover files successfully!");
 }
 
 function search(nameKey, myArray){
@@ -174,8 +174,8 @@ function search(nameKey, myArray){
 
 function startBot(text) {
     
-    download("/home/tobias/mastodon-bot/input.pdf",
-    "/home/tobias/mastodon-bot/output.png",
+    download(__dirname + "/input.pdf",
+    __dirname + "/output.png",
     server + day + ".pdf",
     text,
     prepareImage,
@@ -188,17 +188,18 @@ function startBot(text) {
     day = "";
 }
 
-
-const listener = M.stream('streaming/user')
+const listener = M.stream('streaming/user');
 
 listen();
 
 function listen() {
-    
+    console.log("Listening for mentions and follows on  Bot \"@TheDevMinerTV_Bot\"");
+    var i = 0;
     listener.on('error', err => console.log(err));
-    
     listener.on('message', msg => {
-        fs.writeFileSync(`data.json${Date.now()}`, JSON.stringify(msg, null, 2));
+        
+        // fs.writeFileSync(`data.json${Date.now()}`, JSON.stringify(msg, null, 2));
+        
         if (msg.event === 'notification') {
             if (msg.data.type === 'follow') {
                 const acct = msg.data.account.acct;
@@ -214,28 +215,28 @@ function listen() {
                     i++;
                 }
                 console.log(followsString);
-                toot(`@${acct} Herzlich willkommen bei Tobias' Vertretungplan-Bot`);
+                toot(`@${acct} Herzlich willkommen bei Tobias' Vertretungplan-Bot!`);
                 i = 0;
                 followsString = "";
-
+                
             } else if (msg.data.type === 'mention') {
                 var res = msg.data.status.content.split("</span>");
                 res = res[2];
                 res = res.substring(1, (res.length - 4));
+                
                 if (res === "/vertretungsplan") {
                     whichDay();
                     sleep.sleep(1);
                     
                     var defaultMSG = " Hier ist der Vertretungsplan für " + displayDay;
-                    console.log(`${msg.data.account.acct}${defaultMSG}`);
+                    console.log(`@${msg.data.account.acct} asked for Vertretungsplan!`);
+                    console.log(`Content of Toot: ${msg.data.account.acct}${defaultMSG}`);
                     startBot(`@${msg.data.account.acct}${defaultMSG}`);
-                    
+
+                } else {
+                    console.log(`${msg.data.account.acct} mentioned with ${res}`);
                 }
-                console.log(`Mentioned from ${msg.data.account.acct} with ${res}`); 
-                  
             }   
         }
     });
-    
-    
 }
