@@ -101,7 +101,7 @@ function merge(png, text, tootImg, delFiles){
         gm()
         .in('-page', '+0+0')
         .in(`${imagedir}/image-1.png`)
-        .in('-page', '+0+1696')
+        .in('-page', '+1241+0')
         .in(`${imagedir}/image-2.png`)
         .mosaic()  // Merges the images as a matrix
         .write(png, function (err) {
@@ -114,9 +114,9 @@ function merge(png, text, tootImg, delFiles){
         gm()
         .in('-page', '+0+0')
         .in(`${imagedir}/image-1.png`)
-        .in('-page', '+0+1696')
+        .in('-page', '+1241+0')
         .in(`${imagedir}/image-2.png`)
-        .in('-page', '+0+3392')
+        .in('-page', '+2482+0')
         .in(`${imagedir}/image-3.png`)
         .mosaic()  // Merges the images as a matrix
         .write(png, function (err) {
@@ -136,7 +136,7 @@ function toot(text) {
         if (error){
             console.error(error);
         } else {
-            fs.writeFileSync('data.json', JSON.stringify(data, null, 2));
+            //fs.writeFileSync(`data${data.created_at}.json`, JSON.stringify(data, null, 2));
             console.log("Successful at " + data.created_at + " with ID " + data.id);
         }
     });
@@ -164,43 +164,78 @@ function deleteFiles() {
     }
 }
 
-function startBot() {
-    whichDay();
-    sleep.sleep(1);
+function search(nameKey, myArray){
+    for (var i=0; i < myArray.length; i++) {
+        if (myArray[i].name === nameKey) {
+            return true;
+        }
+    }
+}
+
+function startBot(text) {
     
     download("/home/tobias/mastodon-bot/input.pdf",
     "/home/tobias/mastodon-bot/output.png",
     server + day + ".pdf",
-    "Hier ist der Vertretungsplan für " + displayDay,
+    text,
     prepareImage,
     merge,
     tootImage,
     deleteFiles
     );
+    
+    displayDay = "";
+    day = "";
 }
-
-// startBot();
 
 
 const listener = M.stream('streaming/user')
 
-listener.on('message', msg => {
-    if (msg.event === 'notification') {
-        if (msg.data.type === 'follow') {
-            const acct = msg.data.account.acct;
-            const id = msg.data.account.id;
-            follows.push(`@${msg.data.account.acct}`);
-            toot(`@${msg.data.account.acct} Hello and welcome aboard!`);
-            
-            fs.writeFileSync(`data.json${Date.now()}`, JSON.stringify(msg, null, 2));    
-            console.log("User event!");
-        }
-    }
-    
-});
+listen();
 
-listener.on('error', err => console.log(err));
-while (i < follows.length) {
-    followsString = followsString + follows[i];
+function listen() {
+    
+    listener.on('error', err => console.log(err));
+    
+    listener.on('message', msg => {
+        fs.writeFileSync(`data.json${Date.now()}`, JSON.stringify(msg, null, 2));
+        if (msg.event === 'notification') {
+            if (msg.data.type === 'follow') {
+                const acct = msg.data.account.acct;
+                if (!search(`@${acct}`,follows)) {
+                    follows.push(`@${acct}`);
+                }
+                
+                fs.writeFileSync(`data.json${Date.now()}`, JSON.stringify(msg, null, 2));    
+                console.log("User event!");
+                
+                while (i < (follows.length)) {
+                    followsString = followsString + follows[i] + "\n";
+                    i++;
+                }
+                console.log(followsString);
+                toot(`@${acct} Herzlich willkommen bei Tobias' Vertretungplan-Bot`);
+                i = 0;
+                followsString = "";
+
+            } else if (msg.data.type === 'mention') {
+                var res = msg.data.status.content.split("</span>");
+                res = res[2];
+                res = res.substring(1, (res.length - 4));
+                if (res === "/vertretungsplan") {
+                    whichDay();
+                    sleep.sleep(1);
+                    
+                    var defaultMSG = " Hier ist der Vertretungsplan für " + displayDay;
+                    console.log(`${msg.data.account.acct}${defaultMSG}`);
+                    startBot(`@${msg.data.account.acct}${defaultMSG}`);
+                    
+                }
+                console.log(`Mentioned from ${msg.data.account.acct} with ${res}`); 
+                  
+            }   
+        }
+    });
+    
+    
 }
-toot(`${followsString} Hello and welcome aboard!`);
