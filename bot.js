@@ -186,13 +186,13 @@ function startBot(text) {
     
     displayDay = "";
     day = "";
+
 }
 
-const listener = M.stream('streaming/user');
-
-listen();
-
 function listen() {
+    
+    const listener = M.stream('streaming/user');
+    
     console.log("Listening for mentions and follows on  Bot \"@TheDevMinerTV_Bot\"");
     var i = 0;
     listener.on('error', err => console.log(err));
@@ -232,7 +232,7 @@ function listen() {
                     console.log(`@${msg.data.account.acct} asked for Vertretungsplan!`);
                     console.log(`Content of Toot: ${msg.data.account.acct}${defaultMSG}`);
                     startBot(`@${msg.data.account.acct}${defaultMSG}`);
-
+                    
                 } else {
                     console.log(`${msg.data.account.acct} mentioned with ${res}`);
                 }
@@ -240,3 +240,5 @@ function listen() {
         }
     });
 }
+
+listen();
