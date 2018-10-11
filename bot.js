@@ -10,8 +10,8 @@ const pdftoimage = require('pdftoimage');
 
 
 var server = "http://www.sn.schule.de/~ms55l/";
-var day = "";
-var displayDay = "";
+
+
 var imagedir = __dirname + "/out";
 var follows = [];
 var followsString = "";
@@ -29,7 +29,9 @@ console.log("Mastodon bot starting. . . ");
 function whichDay() {
     let now = new Date();
     var date = datereq.format(now, 'ddd');
-    
+    var day = "";
+    var displayDay = "";
+
     if (date === 'Mon') {
         displayDay = "Montag";
         day = "montag";
@@ -55,6 +57,7 @@ function whichDay() {
         sleep.sleep(60 * 60 * 24);
         whichDay();
     }
+    return { 'day': day, 'displayDay': displayDay };
 }
 
 function downloadFileSync(url, file) {
@@ -103,7 +106,9 @@ function merge(png, text, tootImg, delFiles){
         .write(png, function (err) {
             if (err) console.log(err);
         });
+        
         setTimeout(tootImage, 2500, png, text, delFiles);
+
         
     } else if (((fs.existsSync(imagedir + "/image-1.png")) && (fs.existsSync(imagedir + "/image-2.png"))) && (fs.existsSync(imagedir + "/image-3.png"))) {
         console.log("I have 3 images to merge!")
@@ -172,8 +177,7 @@ function search(nameKey, myArray){
     }
 }
 
-function startBot(text) {
-    
+function startBot(text, day) {
     download(__dirname + "/input.pdf",
     __dirname + "/output.png",
     server + day + ".pdf",
@@ -183,10 +187,6 @@ function startBot(text) {
     tootImage,
     deleteFiles
     );
-    
-    displayDay = "";
-    day = "";
-
 }
 
 function listen() {
@@ -205,9 +205,10 @@ function listen() {
                 const acct = msg.data.account.acct;
                 if (!search(`@${acct}`,follows)) {
                     follows.push(`@${acct}`);
+                    fs.writeFileSync(`follows.json`, JSON.stringify(follows, null, 2));
                 }
                 
-                fs.writeFileSync(`data.json${Date.now()}`, JSON.stringify(msg, null, 2));    
+                fs.writeFileSync(`data-${Date.now()}.json`, JSON.stringify(msg, null, 2));    
                 console.log("User event!");
                 
                 while (i < (follows.length)) {
@@ -225,13 +226,16 @@ function listen() {
                 res = res.substring(1, (res.length - 4));
                 
                 if (res === "/vertretungsplan") {
-                    whichDay();
+                    var dayInfo = whichDay();
+                    var day = dayInfo.day;
+                    var displayDay = dayInfo.displayDay;
+
                     sleep.sleep(1);
                     
                     var defaultMSG = " Hier ist der Vertretungsplan für " + displayDay;
                     console.log(`@${msg.data.account.acct} asked for Vertretungsplan!`);
                     console.log(`Content of Toot: ${msg.data.account.acct}${defaultMSG}`);
-                    startBot(`@${msg.data.account.acct}${defaultMSG}`);
+                    startBot(`@${msg.data.account.acct}${defaultMSG}`, day);
                     
                 } else {
                     console.log(`${msg.data.account.acct} mentioned with ${res}`);
